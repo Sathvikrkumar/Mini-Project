@@ -1,0 +1,153 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* ---------- COLORS & CONFIG ---------- */
+#define RESET "\033[0m"
+#define GREEN "\033[1;32m"
+#define RED "\033[1;31m"
+#define YELLOW "\033[1;33m"
+#define CYAN "\033[1;36m"
+#define FLOORS 3
+#define ROOMS  4
+
+int hotel[FLOORS][ROOMS] = {0};
+char *roomType[FLOORS] = {"Standard", "Deluxe", "Suite"};
+int roomPrice[FLOORS] = {1500, 2500, 4000};
+
+/* ---------- 1. LINKED LIST (Customer Database) ---------- */
+typedef struct Customer {
+    char name[30];
+    int floor, room;
+    struct Customer* next;
+} Customer;
+
+Customer* head = NULL;
+
+void addCustomer(char* name, int f, int r) {
+    Customer* newNode = (Customer*)malloc(sizeof(Customer));
+    strcpy(newNode->name, name);
+    newNode->floor = f;
+    newNode->room = r;
+    newNode->next = head;
+    head = newNode;
+}
+
+/* ---------- 2. STACK (Recent Activity Logs) ---------- */
+#define MAX_LOGS 5
+char logs[MAX_LOGS][50];
+int top = -1;
+
+void pushLog(char* msg) {
+    if (top < MAX_LOGS - 1) {
+        strcpy(logs[++top], msg);
+    } else {
+        for(int i=0; i < MAX_LOGS-1; i++) strcpy(logs[i], logs[i+1]);
+        strcpy(logs[top], msg);
+    }
+}
+
+void showLogs() {
+    printf("\n%s--- RECENT ACTIVITY (STACK) ---%s\n", YELLOW, RESET);
+    if (top == -1) printf("No recent activity.\n");
+    for (int i = top; i >= 0; i--) printf("- %s\n", logs[i]);
+}
+
+/* ---------- 3. QUEUE (Cleaning Requests) ---------- */
+struct QueueNode {
+    int floor, room;
+    struct QueueNode* next;
+} *front = NULL, *rear = NULL;
+
+void enQueue(int f, int r) {
+    struct QueueNode* temp = (struct QueueNode*)malloc(sizeof(struct QueueNode));
+    temp->floor = f; temp->room = r; temp->next = NULL;
+    if (rear == NULL) { front = rear = temp; return; }
+    rear->next = temp; rear = temp;
+}
+
+void deQueue() {
+    if (front == NULL) return;
+    struct QueueNode* temp = front;
+    hotel[front->floor][front->room] = 0; // Set back to Available
+    front = front->next;
+    if (front == NULL) rear = NULL;
+    free(temp);
+}
+
+/* ---------- SYSTEM FUNCTIONS ---------- */
+void showMatrix() {
+    printf("\n%sROOM STATUS MATRIX%s\n", CYAN, RESET);
+    for (int i = 0; i < FLOORS; i++) {
+        printf("Floor %d (%s): ", i + 1, roomType[i]);
+        for (int j = 0; j < ROOMS; j++) {
+            if (hotel[i][j] == 0) printf("%s0 %s", GREEN, RESET);
+            else if (hotel[i][j] == 1) printf("%s1 %s", RED, RESET);
+            else printf("%s2 %s", YELLOW, RESET);
+        }
+        printf("\n");
+    }
+}
+
+void bookRoom() {
+    int f, r; char name[30];
+    showMatrix();
+    printf("Enter Floor (1-%d) & Room (1-%d): ", FLOORS, ROOMS);
+    scanf("%d %d", &f, &r);
+    if (hotel[f-1][r-1] == 0) {
+        printf("Enter Guest Name: ");
+        scanf("%s", name);
+        hotel[f-1][r-1] = 1;
+        addCustomer(name, f, r);
+        char logMsg[50]; sprintf(logMsg, "Booked: %s (F:%d R:%d)", name, f, r);
+        pushLog(logMsg);
+        printf("%sBooked successfully!%s\n", GREEN, RESET);
+    } else printf("%sRoom Occupied!%s\n", RED, RESET);
+}
+
+void requestCleaning() {
+    int f, r;
+    printf("Enter Floor & Room for cleaning: ");
+    scanf("%d %d", &f, &r);
+    hotel[f-1][r-1] = 2;
+    enQueue(f-1, r-1);
+    pushLog("Cleaning Requested");
+    printf("%sAdded to Cleaning Queue.%s\n", YELLOW, RESET);
+}
+
+void processCleaning() {
+    if (front != NULL) {
+        printf("%sProcessing cleaning for Floor %d, Room %d...%s\n", GREEN, front->floor+1, front->room+1, RESET);
+        deQueue();
+        pushLog("Cleaning Completed");
+    } else printf("No rooms in cleaning queue.\n");
+}
+
+/* ---------- MENUS ---------- */
+void userMenu() {
+    int ch;
+    do {
+        printf("\n1. Book Room\n2. View Status\n3. Request Cleaning\n9. Back\nChoice: ");
+        scanf("%d", &ch);
+        if(ch==1) bookRoom(); else if(ch==2) showMatrix(); else if(ch==3) requestCleaning();
+    } while (ch != 9);
+}
+
+void adminMenu() {
+    int ch;
+    do {
+        printf("\n1. Process Next Cleaning (Queue)\n2. View Recent Logs (Stack)\n9. Back\nChoice: ");
+        scanf("%d", &ch);
+        if(ch==1) processCleaning(); else if(ch==2) showLogs();
+    } while (ch != 9);
+}
+
+int main() {
+    int choice;
+    do {
+        printf("\n%s=== HOTEL MANAGEMENT SYSTEM ===%s\n1. User\n2. Admin\n0. Exit\nChoice: ", CYAN, RESET);
+        scanf("%d", &choice);
+        if(choice==1) userMenu(); else if(choice==2) adminMenu();
+    } while (choice != 0);
+    return 0;
+	}
